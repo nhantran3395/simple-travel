@@ -1,5 +1,5 @@
 {
-  "Comment": "Order processing workflow for Simple Hotel",
+  "Comment": "Order processing workflow for Simple Travel",
   "StartAt": "Lambda Invoke",
   "States": {
     "Lambda Invoke": {
