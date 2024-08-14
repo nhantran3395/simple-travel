@@ -1,34 +1,100 @@
 {
   "Comment": "Order processing workflow for Simple Travel",
-  "StartAt": "Lambda Invoke",
+  "StartAt": "Parallel",
   "States": {
-    "Lambda Invoke": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::lambda:invoke",
-      "OutputPath": "$.Payload",
-      "Parameters": {
-        "FunctionName": "arn:aws:lambda:ap-southeast-2:010928216231:function:bookHotel:$LATEST",
-        "Payload": {
-          "buyer_id.$": "$.purchase.buyer_id",
-          "start_date.$": "$.hotel.start_date",
-          "end_date.$": "$.hotel.end_date",
-          "near.$": "$.museum.name"
-        }
-      },
-      "Retry": [
+    "Parallel": {
+      "Type": "Parallel",
+      "Branches": [
         {
-          "ErrorEquals": [
-            "Lambda.ServiceException",
-            "Lambda.AWSLambdaException",
-            "Lambda.SdkClientException",
-            "Lambda.TooManyRequestsException"
-          ],
-          "IntervalSeconds": 1,
-          "MaxAttempts": 3,
-          "BackoffRate": 2
+          "StartAt": "Book hotel",
+          "States": {
+            "Book hotel": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "OutputPath": "$.Payload",
+              "Parameters": {
+                "FunctionName": "arn:aws:lambda:ap-southeast-2:010928216231:function:bookHotel:$LATEST",
+                "Payload": {
+                  "buyer_id.$": "$.purchase.buyer_id",
+                  "start_date.$": "$.hotel.start_date",
+                  "end_date.$": "$.hotel.end_date",
+                  "near.$": "$.museum.name"
+                }
+              },
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException",
+                    "Lambda.TooManyRequestsException"
+                  ],
+                  "IntervalSeconds": 1,
+                  "MaxAttempts": 3,
+                  "BackoffRate": 2
+                }
+              ],
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Book museum",
+          "States": {
+            "Book museum": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "OutputPath": "$.Payload",
+              "Parameters": {
+                "FunctionName": "arn:aws:lambda:ap-southeast-2:010928216231:function:bookMuseum:$LATEST",
+                "Payload": {
+                  "buyer_id.$": "$.purchase.buyer_id",
+                  "when.$": "$.museum.when",
+                  "museum_name.$": "$.museum.name"
+                }
+              },
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException",
+                    "Lambda.TooManyRequestsException"
+                  ],
+                  "IntervalSeconds": 1,
+                  "MaxAttempts": 3,
+                  "BackoffRate": 2
+                }
+              ],
+              "End": true
+            }
+          }
         }
       ],
-      "End": true
+      "ResultSelector": {
+        "hotel": {
+          "start_date.$": "$[0].start_date",
+          "end_date.$": "$[0].end_date",
+          "reservation_id.$": "$[0].reservation_id",
+          "name.$": "$[0].name"
+        },
+        "museum": {
+          "when.$": "$[1].when",
+          "reservation_id.$": "$[1].reservation_id",
+          "name.$": "$[1].name"
+        }
+      },
+      "ResultPath": "$.result",
+      "Next": "Pass"
+    },
+    "Pass": {
+      "Type": "Pass",
+      "End": true,
+      "Parameters": {
+        "purchase.$": "$.purchase",
+        "hotel.$": "$.result.hotel",
+        "museum.$": "$.result.museum"
+      }
     }
   }
 }
